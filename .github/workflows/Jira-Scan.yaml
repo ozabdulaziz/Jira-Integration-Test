@@ -1,1 +1,44 @@
+name: Jira to Code Scanning
+
+on:
+  # Bu sinyal, Jira'daki Webhook'tan gelecektir.
+  repository_dispatch:
+    types: [jira-vuln-trigger]
+
+permissions:
+  contents: read
+  security-events: write # Bu yetki, Code Scanning'e SARIF yüklemek için ZORUNLUDUR.
+
+jobs:
+  upload-sarif:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          pip install requests
+
+      - name: Run SARIF Generator Script
+        env:
+          # ✅ GÜVENLİ YÖNTEM: secrets.GITHUB_TOKEN, GitHub'ın otomatik ve geçici token'ıdır.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+          
+          # ✅ DİNAMİK: Repo sahibini otomatik olarak alır (örn: ozabdulaziz)
+          GH_OWNER: ${{ github.repository_owner }} 
+          
+          # ✅ DİNAMİK: Repo adını otomatik olarak alır (örn: Jira-Integration-Test)
+          GH_REPO: ${{ github.event.repository.name }} 
+          
+          # Jira'dan gelen tüm JSON payload'unu Python'a JIRA_DATA değişkeni olarak gönderir
+          JIRA_DATA: ${{ toJson(github.event.client_payload) }}
+        run: |
+          # PYTHON SCRIPT ADINIZI KONTROL EDİN! (Sizinki 'github-test.py' olabilir)
+          python .github/scripts/jira_to_sarif.py
 
