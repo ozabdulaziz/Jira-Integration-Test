@@ -9,9 +9,9 @@ import time
 # CONFIG
 # =============================================================================
 
-GITHUB_TOKEN = os.getenv("GH_TOKEN")
-GITHUB_OWNER = os.getenv("GH_OWNER")
-GITHUB_REPO = os.getenv("GH_REPO")
+GITHUB_TOKEN = os.getenv("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")
+GITHUB_OWNER = os.getenv("ozabdulaziz")
+GITHUB_REPO = os.getenv("Jira-Integration-Test")
 GITHUB_BRANCH = "main" # veya os.getenv("GH_BRANCH")
 
 try:
@@ -200,3 +200,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
