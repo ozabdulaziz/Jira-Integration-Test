@@ -1,10 +1,11 @@
+import os
+import sys
 import requests
 import json
 import base64
 import gzip
-import sys
 import time
-import os
+
 # =============================================================================
 # CONFIG
 # =============================================================================
@@ -12,28 +13,31 @@ import os
 GITHUB_TOKEN = os.getenv("GH_TOKEN")
 GITHUB_OWNER = os.getenv("GH_OWNER")
 GITHUB_REPO = os.getenv("GH_REPO")
-GITHUB_BRANCH = "main" # veya os.getenv("GH_BRANCH")
+GITHUB_BRANCH = os.getenv("GH_BRANCH", "main")
 
+# Token kontrolü
+if not GITHUB_TOKEN:
+    print("❌ Hata: GH_TOKEN bulunamadı! Secret ayarlarını kontrol edin.")
+    sys.exit(1)
+
+# Jira Verisini Al
 try:
     jira_payload = os.getenv("JIRA_DATA")
     if jira_payload:
-        # Jira tek bir issue gönderir, biz onu listeye çeviririz
         single_issue = json.loads(jira_payload)
         JIRA_ISSUES = [single_issue]
     else:
-        print("❌ Hata: JIRA_DATA environment değişkeni bulunamadı!")
-        sys.exit(1)
+        # Test için dummy data (Eğer environment boşsa)
+        print("⚠️ Uyarı: JIRA_DATA bulunamadı, test verisi kullanılıyor.")
+        JIRA_ISSUES = [] 
 except Exception as e:
     print(f"❌ JSON Parse Hatası: {e}")
     sys.exit(1)
 
-# ... Geri kalan create_sarif, upload ve main fonksiyonları AYNI KALSIN ...
-
 
 def create_sarif(issues):
-    """Create beautiful SARIF with rich formatting"""
-
-    # Unique timestamp for this upload
+    """Create SARIF with safe data handling (No KeyErrors)"""
+    
     upload_timestamp = str(int(time.time()))
 
     sarif = {
@@ -42,10 +46,8 @@ def create_sarif(issues):
         "runs": [{
             "tool": {
                 "driver": {
-                    "name": "Getir Security Team - Penetration Test",
-                    "semanticVersion": "3.0.0",
-                    "informationUri": "https://security.getir.com",
-                    "organization": "Getir Cybersecurity Operations",
+                    "name": "Jira Pentest Integration",
+                    "semanticVersion": "1.0.0",
                     "rules": []
                 }
             },
@@ -53,74 +55,77 @@ def create_sarif(issues):
         }]
     }
 
+    if not issues:
+        return sarif
+
     run = sarif["runs"][0]
 
     for idx, issue in enumerate(issues):
-        c = issue["custom"]
-        rule_id = f"PENTEST-{issue['key']}"
+        # 'custom' alanı yoksa boş sözlük ata
+        c = issue.get("custom", {})
+        
+        # GÜVENLİ VERİ ALIMI (.get metodu)
+        # Eğer veri yoksa ikinci parametredeki varsayılan metni kullanır.
+        key = issue.get("key", "UNKNOWN")
+        summary = issue.get("summary", "No Summary")
+        desc = c.get("description", "No description provided.")
+        impact = c.get("impact", "See Jira task for impact details.")
+        remediation = c.get("remediation", "See Jira task for remediation.")
+        poc = c.get("poc", "No PoC provided.")
+        cvss = c.get("cvss", "0.0")
+        cvss_vector = c.get("cvss_vector", "N/A")
+        cwe_id = c.get("cwe_id", "CWE-000")
+        jira_url = c.get("jira_url", "#")
+        file_path = c.get("file", "unknown_location")
+        line_num = c.get("line", 1)
 
-        # Beautiful rule
+        rule_id = f"JIRA-{key}"
+
+        # 1. KURAL TANIMI (Rule Definition)
         rule = {
             "id": rule_id,
-            "name": issue["key"].replace("-", "_"),
+            "name": key,
             "shortDescription": {
-                "text": issue["summary"]
+                "text": summary
             },
             "fullDescription": {
-                "text": f"{c['description']}\n\n{c['impact']}"
+                "text": f"{desc}\n\nImpact: {impact}"
             },
             "help": {
-                "text": f"JIRA: {issue['key']}\nCVSS: {c['cvss']} ({c['cvss_vector']})\nCWE: {c['cwe_id']} - {c['cwe_name']}\nOWASP: {c['owasp']}\n\n{c['remediation']}",
-                "markdown": f"# {issue['summary']}\n\n{c['description']}\n\n## Impact\n\n{c['impact']}\n\n## Proof of Concept\n\n{c['poc']}\n\n## Remediation\n\n{c['remediation']}\n\n## Metadata\n\n- **JIRA:** [{issue['key']}]({c['jira_url']})\n- **CVSS:** {c['cvss']} `{c['cvss_vector']}`\n- **CWE:** {c['cwe_id']} - {c['cwe_name']}\n- **OWASP:** {c['owasp']}\n- **Assignee:** {issue['assignee']}\n- **Status:** {issue['status']}\n- **Effort:** {c['effort']}\n- **Risk:** {c['risk']}\n- **Compliance:** {c['compliance']}"
+                "text": f"JIRA Task: {key}\nCVSS: {cvss}\nRemediation: {remediation}",
+                "markdown": f"# {summary}\n\n{desc}\n\n## Impact\n{impact}\n\n## Remediation\n{remediation}\n\n[View in Jira]({jira_url})"
             },
             "defaultConfiguration": {
-                "level": {"critical": "error", "high": "error", "medium": "warning", "low": "note"}[issue["severity"]]
+                "level": "error" 
             },
             "properties": {
-                "tags": issue["labels"],
-                "precision": "very-high",
-                "security-severity": c["cvss"]
+                "security-severity": cvss
             }
         }
         run["tool"]["driver"]["rules"].append(rule)
 
-        # Beautiful result message - SHORT!
+        # 2. SONUÇ (Result)
         result = {
             "ruleId": rule_id,
             "ruleIndex": idx,
-            "level": {"critical": "error", "high": "error", "medium": "warning", "low": "note"}[issue["severity"]],
+            "level": "error",
             "message": {
-                "text": f"[{issue['severity'].upper()}] {issue['summary']} - CVSS {c['cvss']} | {c['cwe_id']} | JIRA: {issue['key']} ({c['jira_url']}) | Assignee: {issue['assignee']} | {c['owasp']}"
+                "text": f"{summary} (CVSS {cvss})"
             },
             "locations": [{
                 "physicalLocation": {
                     "artifactLocation": {
-                        "uri": c["file"],
+                        "uri": file_path,
                         "uriBaseId": "%SRCROOT%"
                     },
                     "region": {
-                        "startLine": c["line"]
+                        "startLine": int(line_num),
+                        "endLine": int(line_num)
                     }
                 }
             }],
             "partialFingerprints": {
-                "primaryLocationLineHash": f"{issue['key']}-{upload_timestamp}"
-            },
-            "properties": {
-                "jira_key": issue["key"],
-                "jira_url": c["jira_url"],
-                "security-severity": c["cvss"],
-                "cvss_vector": c["cvss_vector"],
-                "cwe_id": c["cwe_id"],
-                "cwe_name": c["cwe_name"],
-                "owasp": c["owasp"],
-                "priority": issue["priority"],
-                "severity": issue["severity"],
-                "status": issue["status"],
-                "assignee": issue["assignee"],
-                "effort": c["effort"],
-                "risk_level": c["risk"],
-                "compliance_violations": c["compliance"]
+                "primaryLocationLineHash": f"{key}-{upload_timestamp}"
             }
         }
         run["results"].append(result)
@@ -129,77 +134,78 @@ def create_sarif(issues):
 
 
 def upload(sarif_data):
-    """Upload to GitHub"""
-
-    print("📍 Getting commit...")
-    r = requests.get(
-        f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/commits/{GITHUB_BRANCH}",
-        headers={
-            "Authorization": f"Bearer {GITHUB_TOKEN}",
-            "Accept": "application/vnd.github+json"
-        }
-    )
-
-    if r.status_code != 200:
-        print(f"❌ Error: {r.status_code}")
+    """Upload to GitHub Code Scanning API"""
+    
+    if not GITHUB_TOKEN:
         return False
 
-    commit_sha = r.json()["sha"]
-    print(f"   ✅ {commit_sha[:8]}")
+    print("📍 Getting commit info...")
+    try:
+        r = requests.get(
+            f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/commits/{GITHUB_BRANCH}",
+            headers={
+                "Authorization": f"Bearer {GITHUB_TOKEN}",
+                "Accept": "application/vnd.github+json"
+            }
+        )
+        
+        if r.status_code != 200:
+            print(f"❌ Commit alınamadı: {r.status_code} - {r.text}")
+            return False
 
-    print("\n📦 Compressing SARIF...")
-    sarif_gzip = gzip.compress(json.dumps(sarif_data).encode())
-    sarif_b64 = base64.b64encode(sarif_gzip).decode()
+        commit_sha = r.json()["sha"]
+        print(f"   ✅ Commit SHA: {commit_sha[:8]}")
 
-    print("📤 Uploading...")
-    r = requests.post(
-        f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/code-scanning/sarifs",
-        headers={
-            "Authorization": f"Bearer {GITHUB_TOKEN}",
-            "Accept": "application/vnd.github+json"
-        },
-        json={
-            "commit_sha": commit_sha,
-            "ref": f"refs/heads/{GITHUB_BRANCH}",
-            "sarif": sarif_b64
-        }
-    )
+        print("\n📦 Compressing SARIF...")
+        sarif_json = json.dumps(sarif_data)
+        sarif_gzip = gzip.compress(sarif_json.encode())
+        sarif_b64 = base64.b64encode(sarif_gzip).decode()
 
-    if r.status_code == 202:
-        print("✅ SUCCESS!")
-        print(f"\n🔍 https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/security/code-scanning")
-        return True
-    else:
-        print(f"❌ Error: {r.status_code}\n{r.text}")
+        print("📤 Uploading to Code Scanning...")
+        r = requests.post(
+            f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/code-scanning/sarifs",
+            headers={
+                "Authorization": f"Bearer {GITHUB_TOKEN}",
+                "Accept": "application/vnd.github+json"
+            },
+            json={
+                "commit_sha": commit_sha,
+                "ref": f"refs/heads/{GITHUB_BRANCH}",
+                "sarif": sarif_b64,
+                "tool_name": "Jira Integration"
+            }
+        )
+
+        if r.status_code == 202:
+            print("✅ SUCCESS! Rapor başarıyla yüklendi.")
+            print(f"🔍 Sonuçları şurada görün: https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/security/code-scanning")
+            return True
+        else:
+            print(f"❌ Upload Hatası: {r.status_code}\n{r.text}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Bağlantı Hatası: {e}")
         return False
 
 
 def main():
-    print("=" * 70)
-    print("🔒 GETIR SECURITY - Professional Pentest Report")
-    print("=" * 70)
-    print()
+    print("=" * 60)
+    print("🔒 JIRA TO GITHUB SECURITY SCANNING")
+    print("=" * 60)
 
-    for i in JIRA_ISSUES:
-        e = {"critical": "🔴", "high": "🟠", "medium": "🟡", "low": "⚪"}[i["severity"]]
-        print(f"   {e} {i['key']} - {i['summary']}")
+    if not JIRA_ISSUES:
+        print("ℹ️ İşlenecek veri yok, çıkılıyor.")
+        return
 
-    print(f"\n🔄 Creating professional SARIF...")
+    print(f"\n🔄 {len(JIRA_ISSUES)} adet bulgu işleniyor...")
     sarif = create_sarif(JIRA_ISSUES)
 
-    with open("sarif.template", "w") as f:
-        json.dump(sarif, f, indent=2)
-    print("   💾 Saved locally")
-
-    print()
     if upload(sarif):
-        print("\n✅ Done! Check GitHub Security tab")
+        print("\n✅ İŞLEM TAMAMLANDI")
     else:
+        print("\n❌ İŞLEM BAŞARISIZ")
         sys.exit(1)
-
 
 if __name__ == "__main__":
     main()
-
-
-
