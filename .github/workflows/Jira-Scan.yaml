@@ -39,6 +39,6 @@ jobs:
           # Jira'dan gelen tüm JSON payload'unu Python'a JIRA_DATA değişkeni olarak gönderir
           JIRA_DATA: ${{ toJson(github.event.client_payload) }}
         run: |
-          # PYTHON SCRIPT ADINIZI KONTROL EDİN! (Sizinki 'github-test.py' olabilir)
-          python .github/scripts/jira_to_sarif.py
+          python .github/scripts/github-test.py
+
 
